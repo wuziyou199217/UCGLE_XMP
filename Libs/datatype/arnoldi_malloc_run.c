@@ -5,20 +5,22 @@
 #include "arnoldi_gmres.h"
 
 #pragma xmp nodes p(NPES)
-#pragma xmp template t(0:ROWS_NUM-1)
+#pragma xmp template t(:)
 #pragma xmp distribute t(block) onto p
 
 //matrix and vector for parallel computing
-double mat[ROWS_NUM][COLS_NUM];
-double mat_ell[ROWS_NUM][COLS_ELL_NUM];
-double V[ROWS_NUM];
+double (*mat)[COLS_NUM];
+double (*mat_ell)[COLS_ELL_NUM];
+double * V;
+
 #pragma xmp align mat[i][*] with t(i)
-#pragma xmp align mat_ell[ROWS_NUM][COLS_ELL_NUM] with t(i)
+#pragma xmp align mat_ell[i][*] with t(i)
 #pragma xmp align V[i] with t(i)
+#pragma xmp template_fix t(0:ROWS_NUM-1)
 
 //global data
-double m[ROWS_NUM][COLS_NUM];
-double m_ell[ROWS_NUM][COLS_ELL_NUM];
+double ** m;
+double ** m_ell;
 //function which aide the routine
 void readMatrix_matrix();
 void readMatrix_ellpack();
@@ -196,28 +198,40 @@ Read Matrix
 ******************************/
 void readMatrix_matrix()
 {
+	//initialize matrix m
+	m = malloc(sizeof(double *) * ROWS_NUM);
+	for(int i=0; i<ROWS_NUM; i++){
+		m[i] = malloc(sizeof(double) * COLS_NUM);
+	}
+
 	FILE * f1;
 	double * temp = malloc(sizeof(double));
 
-	f1 = fopen("mat_sample3.txt", "rb");
+	f1 = fopen("mat_sample5.txt", "rb");
 	for(int i=0; i<ROWS_NUM; i++){
 		for(int j=0; j<COLS_NUM; j++){
 			fread(temp, sizeof(double), 1, f1);
-			m[i][j] = * temp;
+			*(*(m + i) + j) = * temp;
 		}
 	}
 }
 
 void readMatrix_ellpack()
 {
+	//Initialize of m_ell
+	m_ell = malloc(sizeof(double *) * ROWS_NUM);
+	for(int i=0; i<ROWS_NUM; i++){
+		m_ell[i] = malloc(sizeof(double) * COLS_ELL_NUM);
+	}
+
 	FILE * f1;
 	double * temp = malloc(sizeof(double));
 
-	f1 = fopen("mat_ell_sample3.txt", "rb");
+	f1 = fopen("mat_ell_sample5.txt", "rb");
 	for(int i=0; i<ROWS_NUM; i++){
 		for(int j=0; j<COLS_ELL_NUM; j++){
 			fread(temp, sizeof(double), 1, f1);
-			m_ell[i][j] = * temp;
+			*(*(m_ell + i) + j) = * temp;
 		}
 	}
 }
@@ -234,15 +248,17 @@ void initialize_matrix(vector * v, matrix * matQ, matrix * matH){
 	matrix_init(matQ, restart_max, COLS_NUM);
 	matrix_init(matH, restart_max, restart_max);
 
+	mat = (double (*)[COLS_NUM])xmp_malloc(xmp_desc_of(mat), ROWS_NUM, COLS_NUM);
 	#pragma xmp loop on t(i)
 {
 	for(int i=0; i<ROWS_NUM; i++){
 		for(int j=0; j<COLS_NUM; j++){
-			mat[i][j] = m[i][j];
+			mat[i][j] = *(*(m + i) + j);
 		}
 	}
 }
 
+	V = (double *)xmp_malloc(xmp_desc_of(V), ROWS_NUM);
 	#pragma xmp loop on t(i)
 {
 	for(int i=0; i<ROWS_NUM; i++){
@@ -260,15 +276,17 @@ void initialize_ellpack(vector * v, matrix * matQ, matrix * matH){
 	matrix_init(matQ, restart_max, COLS_NUM);
 	matrix_init(matH, restart_max, restart_max);
 
+	mat_ell = (double (*)[COLS_ELL_NUM])xmp_malloc(xmp_desc_of(mat_ell), ROWS_NUM, COLS_ELL_NUM);
 	#pragma xmp loop on t(i)
 {
 	for(int i=0; i<ROWS_NUM; i++){
 		for(int j=0; j<COLS_ELL_NUM; j++){
-			mat_ell[i][j] = m_ell[i][j];
+			mat_ell[i][j] = *(*(m_ell + i) + j);
 		}
 	}
 }
 
+	V = (double *)xmp_malloc(xmp_desc_of(V), ROWS_NUM);
 	#pragma xmp loop on t(i)
 {
 	for(int i=0; i<ROWS_NUM; i++){
@@ -328,5 +346,3 @@ void Xmp_vector_duplicate(double * v, vector * r){
 		vector_add_duplicate(r, (void *)(v + i));
 	}
 }
-
-

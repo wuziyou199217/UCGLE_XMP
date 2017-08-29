@@ -13,7 +13,7 @@ double mat[ROWS_NUM][COLS_NUM];
 double mat_ell[ROWS_NUM][COLS_ELL_NUM];
 double V[ROWS_NUM];
 #pragma xmp align mat[i][*] with t(i)
-#pragma xmp align mat_ell[ROWS_NUM][COLS_ELL_NUM]
+#pragma xmp align mat_ell[ROWS_NUM][COLS_ELL_NUM] with t(i)
 #pragma xmp align V[i] with t(i)
 
 //global data
@@ -33,7 +33,7 @@ int main(void){
 	double start_time, stop_time, elapsed_time;
 	//Read matrix data
 	//readMatrix_matrix();
-	readMatrix_ellpack();
+	readMatrix_matrix();
 	#pragma xmp barrier
 
 	#pragma xmp task on p(1)
